@@ -26,7 +26,7 @@ export const createQuestionRoute: FastifyPluginCallbackZod = (app) => {
 
       const embeddingsAsString = `[${embeddings.join(",")}]`;
 
-      const chunks = await db
+      const chunksAudio = await db
         .select({
           id: schema.audioChunks.id,
           transcription: schema.audioChunks.transcription,
@@ -44,12 +44,42 @@ export const createQuestionRoute: FastifyPluginCallbackZod = (app) => {
         )
         .limit(3);
 
+      const chunksSumarry = await db
+        .select({
+          id: schema.sumarryChunks.id,
+          transcription: schema.sumarryChunks.content,
+          similarity: sql<number>`1 - (${schema.sumarryChunks.embeddings} <=> ${embeddingsAsString}::vector)`,
+        })
+        .from(schema.sumarryChunks)
+        .where(
+          and(
+            eq(schema.sumarryChunks.roomId, roomId),
+            sql`1 - (${schema.sumarryChunks.embeddings} <=> ${embeddingsAsString}::vector) > 0.7`
+          )
+        )
+        .orderBy(
+          sql`${schema.sumarryChunks.embeddings} <=> ${embeddingsAsString}::vector`
+        )
+        .limit(3);
+
       let answer: string | null = null;
+      console.log("chunksAudio", chunksAudio.length);
+      console.log("chunksSumarry", chunksSumarry.length);
 
-      if (chunks.length > 0) {
-        const transcriptions = chunks.map((chunk) => chunk.transcription);
+      if (chunksAudio.length > 0) {
+        const audioTranscriptions = chunksAudio.map(
+          (chunk) => chunk.transcription
+        );
 
-        answer = await generateAnswer(question, transcriptions);
+        const sumarryTranscriptions = chunksSumarry.map(
+          (chunk) => chunk.transcription
+        );
+
+        answer = await generateAnswer(
+          question,
+          audioTranscriptions,
+          sumarryTranscriptions
+        );
       }
 
       const result = await db

@@ -1,18 +1,18 @@
-import { GoogleGenAI } from '@google/genai'
-import { env } from '../env.ts'
+import { GoogleGenAI } from "@google/genai";
+import { env } from "../env.ts";
 
 const gemini = new GoogleGenAI({
   apiKey: env.GEMINI_API_KEY,
-})
+});
 
-const model = 'gemini-2.5-flash'
+const model = "gemini-2.5-flash";
 
 export async function transcribeAudio(audioAsBase64: string, mimeType: string) {
   const response = await gemini.models.generateContent({
     model,
     contents: [
       {
-        text: 'Transcreva o áudio para português do Brasil. Seja preciso e natural na transcrição. Mantenha a pontuação adequada e divida o texto em parágrafos quando for apropriado.',
+        text: "Transcreva o áudio para português do Brasil. Seja preciso e natural na transcrição. Mantenha a pontuação adequada e divida o texto em parágrafos quando for apropriado.",
       },
       {
         inlineData: {
@@ -21,42 +21,47 @@ export async function transcribeAudio(audioAsBase64: string, mimeType: string) {
         },
       },
     ],
-  })
+  });
 
   if (!response.text) {
-    throw new Error('Não foi possível converter o áudio')
+    throw new Error("Não foi possível converter o áudio");
   }
 
-  return response.text
+  return response.text;
 }
 
 export async function generateEmbeddings(text: string) {
   const response = await gemini.models.embedContent({
-    model: 'text-embedding-004',
+    model: "text-embedding-004",
     contents: [{ text }],
     config: {
-      taskType: 'RETRIEVAL_DOCUMENT',
+      taskType: "RETRIEVAL_DOCUMENT",
     },
-  })
+  });
 
   if (!response.embeddings?.[0].values) {
-    throw new Error('Não foi possível gerar os embeddings.')
+    throw new Error("Não foi possível gerar os embeddings.");
   }
 
-  return response.embeddings[0].values
+  return response.embeddings[0].values;
 }
 
 export async function generateAnswer(
   question: string,
-  transcriptions: string[]
+  transcriptions: string[],
+  transcriptionsSumarry: string[]
 ) {
-  const context = transcriptions.join('\n\n')
+  const context = transcriptions.join("\n\n");
+  const contextSummary = transcriptionsSumarry.join("\n\n");
 
   const prompt = `
-    Com base no texto fornecido abaixo como contexto, responda a pergunta de forma clara e precisa em português do Brasil.
+    Com base nos texto fornecido abaixo como contexto e resumo, responda a pergunta de forma clara e precisa em português do Brasil.
   
     CONTEXTO:
     ${context}
+
+    RESUMO
+    ${contextSummary}
 
     PERGUNTA:
     ${question}
@@ -68,7 +73,8 @@ export async function generateAnswer(
     - Mantenha um tom educativo e profissional;
     - Cite trechos relevantes do contexto se apropriado;
     - Se for citar o contexto, utilize o temo "conteúdo da aula";
-  `.trim()
+    - Separe as respostas entre Contexto e Resumo
+  `.trim();
 
   const response = await gemini.models.generateContent({
     model,
@@ -77,11 +83,11 @@ export async function generateAnswer(
         text: prompt,
       },
     ],
-  })
+  });
 
   if (!response.text) {
-    throw new Error('Falha ao gerar resposta pelo Gemini')
+    throw new Error("Falha ao gerar resposta pelo Gemini");
   }
 
-  return response.text
+  return response.text;
 }
