@@ -4,6 +4,7 @@ import { z } from "zod/v4";
 import { db } from "../../db/connection.ts";
 import { schema } from "../../db/schema/index.ts";
 import { generateAnswer, generateEmbeddings } from "../../services/gemini.ts";
+import { sumarryChunks } from "../../db/schema/sumarry-chucks.ts";
 
 export const createQuestionRoute: FastifyPluginCallbackZod = (app) => {
   app.post(
@@ -51,12 +52,7 @@ export const createQuestionRoute: FastifyPluginCallbackZod = (app) => {
           similarity: sql<number>`1 - (${schema.sumarryChunks.embeddings} <=> ${embeddingsAsString}::vector)`,
         })
         .from(schema.sumarryChunks)
-        .where(
-          and(
-            eq(schema.sumarryChunks.roomId, roomId),
-            sql`1 - (${schema.sumarryChunks.embeddings} <=> ${embeddingsAsString}::vector) > 0.7`
-          )
-        )
+        .where(and(eq(schema.sumarryChunks.roomId, roomId)))
         .orderBy(
           sql`${schema.sumarryChunks.embeddings} <=> ${embeddingsAsString}::vector`
         )
@@ -66,7 +62,7 @@ export const createQuestionRoute: FastifyPluginCallbackZod = (app) => {
       console.log("chunksAudio", chunksAudio.length);
       console.log("chunksSumarry", chunksSumarry.length);
 
-      if (chunksAudio.length > 0) {
+      if (chunksAudio.length > 0 || sumarryChunks) {
         const audioTranscriptions = chunksAudio.map(
           (chunk) => chunk.transcription
         );
